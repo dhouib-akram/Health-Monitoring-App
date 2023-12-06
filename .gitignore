@@ -1,6 +1,7 @@
 ./backend/__pycache__
 ./backend/test.py
 ./backend/entity/__pycache__
+./backend/rf_model_73
 ./heart-attack-prediction/__pycache__
 ./heart-attack-prediction/cardio_train.csv
 
