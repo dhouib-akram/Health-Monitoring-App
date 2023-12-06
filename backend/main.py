@@ -76,15 +76,17 @@ async def register(request:Request):
     data = await request.json()
         #measures=entity.Measures(**data.get(data["measures"], {})),
     if data["role"] == "doctor":
-        if doctors_collection.find_one({"username": data['username']}):
-            raise HTTPException(status_code=400, detail="Username already registered")
+
         doctor = Doctor.Doctor(
             username=data["username"],
             password=data["password"],
             email=data["email"],
             role=data["role"]
         )
+        if doctors_collection.find_one({"username": data['username']}):
+            raise HTTPException(status_code=400, detail="Username already registered")
         doctors_collection.insert_one(doctor.dict())
+        return 'Registered !'
     else: 
         user = User.User(
         username=data["username"],
@@ -97,8 +99,6 @@ async def register(request:Request):
         if users_collection.find_one({"username": data["username"]}):
             raise HTTPException(status_code=400, detail="Username already registered")
         users_collection.insert_one(user.dict())
-
-    if data["role"]== "user" and "DoctorContact" in data:
         doctor_username = data["DoctorContact"]
         existing_doctor = doctors_collection.find_one({"username": doctor_username})
         if existing_doctor:
@@ -106,8 +106,11 @@ async def register(request:Request):
             users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
         else:
             user.DoctorContact = ""
+        return 'Registered !'
 
 
+        
+    
 # Updated login path to set the cookie
 @app.post("/login")
 async def login(request: Request):
