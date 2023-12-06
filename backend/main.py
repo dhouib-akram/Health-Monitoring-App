@@ -1,42 +1,21 @@
-from urllib import request
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from pymongo import MongoClient
+from fastapi import FastAPI
+from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
-from entity.User import User
+from entity import User,Doctor
 from jose import JWTError, jwt
+from fastapi import Depends, HTTPException,status
 from fastapi.responses import JSONResponse, Response
 from fastapi import Request
-
 from datetime import datetime, timedelta
-from typing import Annotated
-from typing import Union
 from typing import Optional
-from fastapi.middleware.cors import CORSMiddleware
-
-import joblib
-import sys
-sys.path.append("..")
-from heart_attack_prediction.preprocess.preprocess_data import preprocess
-# loaded_rf_model = joblib.load('rf_new.joblib')
-
+import logging 
 
 app = FastAPI()
-
-# Set up CORS
-origins = [
-     "*",          # Allow requests from localhost during development
-  # Add more origins as needed
-]
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+logging.basicConfig(level=logging.DEBUG)
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 SECRET_KEY = "IYAwM+O69b20dBSjHAiBeX6NdHu6Ca9nklSc8A+cn9Y="
@@ -48,8 +27,6 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 class Token(BaseModel):
     access_token: str
     token_type: str
-
-
 
 class TokenData(BaseModel):
     username: Optional[str] = None
@@ -80,10 +57,6 @@ async def get_current_user(token: str = Depends(oauth2_scheme)):
         return user
     except JWTError:
         raise credentials_exception
-
-
-app = FastAPI()
-
 # def hash_pass(password: str):
 #     return pwd_context.hash(password)
 @app.get("/")
@@ -92,37 +65,57 @@ async def root():
 
 # Connect to MongoDB
 client = MongoClient("mongodb://localhost:27017")
-db = client["HealthData"]
-users_collection = db["Users"]
-
-
-
-
+db = client["helath"]
+users_collection = db["user"]
+doctors_collection = db["doctors"]
 
 @app.post("/register")
+
 async def register(request:Request):
     # Check if the username already exists
     data = await request.json()
-    username = data.get("username")
-    password = data.get("password")
-    email = data.get("email")
-    emergencyContactEmail = data.get("emergencyContactEmail")
-    if users_collection.find_one({"username": username}):
-        raise HTTPException(status_code=400, detail="Username already registered")
-        # Store user data in MongoDB
-    user_data = {"username": username, "password": password, 'email': email,"emergencyContactEmail": emergencyContactEmail}
-    users_collection.insert_one(user_data)
+        #measures=entity.Measures(**data.get(data["measures"], {})),
+    if data["role"] == "doctor":
+        if doctors_collection.find_one({"username": data['username']}):
+            raise HTTPException(status_code=400, detail="Username already registered")
+        doctor = Doctor.Doctor(
+            username=data["username"],
+            password=data["password"],
+            email=data["email"],
+            role=data["role"]
+        )
+        doctors_collection.insert_one(doctor.dict())
+    else: 
+        user = User.User(
+        username=data["username"],
+        password=data['password'],
+        email=data["email"],
+        role=data.get("role", "user"),
+        emergencyContactEmail=data["emergencyContactEmail"],
+        DoctorContact= data.get(data["DoctorContact"],""),
+        health_data=User.HealthData(**data["health_data"]))
+        if users_collection.find_one({"username": data["username"]}):
+            raise HTTPException(status_code=400, detail="Username already registered")
+        users_collection.insert_one(user.dict())
 
-    return {"message": "User registered successfully"}
+    if data["role"]== "user" and "DoctorContact" in data:
+        doctor_username = data["DoctorContact"]
+        existing_doctor = doctors_collection.find_one({"username": doctor_username})
+        if existing_doctor:
+            doctors_collection.update_one({"username": doctor_username}, {"$push": {"patients": user.username}})
+            users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
+        else:
+            user.DoctorContact = ""
 
 
 # Updated login path to set the cookie
-@app.post("/token")
+@app.post("/login")
 async def login(request: Request):
     # Validate username and password (compare hashed password with stored hash)
-    data = await request.json()
+    data = await request.form()
     username = data.get("username")
     password = data.get("password")
+    user = users_collection.find_one({"username": username})
     user = users_collection.find_one({"username": username})
     if user and pwd_context.verify(password, user["password"]):
       
@@ -133,50 +126,3 @@ async def login(request: Request):
         return {"access_token": access_token, "token_type": "bearer"}
     else :
         raise HTTPException(status_code=400, detail="Incorrect username or password")
-
-@app.get("/users/{username}")
-async def get_user(username: str):
-    user = users_collection.find_one({"username": username})
-    
-    if user:
-        return {
-            "username": user["username"],
-            "password": user["password"],
-            "email": user["email"],
-            "emergencyContactEmail": user["emergencyContactEmail"]
-        }
-    else:
-        raise HTTPException(status_code=404, detail="User not found")
-
-# Endpoint that requires authentication
-@app.get("/user/me/", response_model=User)
-async def read_users_me(current_user: dict = Depends(get_current_user)):
-    # Access the current user
-    return current_user
-
-# data=    {
-#   "age": 54,
-#   "height":168,
-#   "weight": 62,
-#   "gender": 2,
-#   "ap_hi": 110,
-#   "ap_lo": 80,
-#   "cholesterol": 1,
-#   "gluc": 1,
-#   "smoke": 0,
-#   "alco": 1,
-#   "active": 0,
-
-# }
-@app.post('/predict')
-async def predict_heart_attack(request: Request):
-    # Convert input data to a numpy array for prediction
-    data = await request.json()
-    data_dict = {key: int(value) for key, value in data.items()}
- 
-    loaded_rf_model = joblib.load('rf_model_73.joblib')
-
-    # Make predictions using the loaded model
-    prediction = loaded_rf_model.predict(preprocess(data_dict))
-    # Return the prediction as a response
-    return {"prediction": int(prediction)}

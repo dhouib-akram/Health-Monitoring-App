@@ -7,28 +7,11 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 from pydantic import BaseModel
 
-class HealthData(BaseModel):
-    age: int
-    height: int
-    weight: int
-    gender: int
-    ap_hi: int
-    ap_lo: int
-    cholesterol: int
-    gluc: int
-    smoke: int
-    alco: int
-    active: int
-
-class User(BaseModel):
+class Doctor(BaseModel):
     username: str
     password: str
     email: EmailStr
-    emergencyContactEmail: EmailStr
     role: str
-    health_data: HealthData
-    DoctorContact: str
-
 
     def __init__(self, **data):
         super().__init__(**data)
@@ -42,9 +25,6 @@ class User(BaseModel):
 
     def get_email(self):
         return self.email
-
-    def get_emergency_contact_email(self):
-        return self.emergencyContactEmail
 
     @staticmethod
     def hash_pass(password: str):
