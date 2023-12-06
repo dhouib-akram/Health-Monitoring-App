@@ -1,0 +1,14 @@
+./backend/__pycache__
+./backend/test.py
+./backend/entity/__pycache__
+./heart-attack-prediction/__pycache__
+./heart-attack-prediction/cardio_train.csv
+
+./heart-attack-prediction/best_rf.pkl
+./heart-attack-prediction/rf_model.joblib
+./heart-attack-prediction/rf_model_73.joblib
+./heart-attack-prediction/preprocess/__pycache__
+./heart-attack-prediction/preprocess/kmodes_model_female.joblib
+./heart-attack-prediction/preprocess/kmodes_model_male.joblib
+./heart-attack-prediction/preprocess/rf_model_73.joblib
+
