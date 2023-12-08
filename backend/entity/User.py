@@ -23,9 +23,7 @@ class User(BaseModel):
     password: str
     email: EmailStr
     emergencyContactEmail: EmailStr
-    role: str
     health_data: HealthData
-    DoctorContact: str
 
 
     def __init__(self, **data):

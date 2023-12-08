@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException,status
 from fastapi.responses import JSONResponse, Response
 from fastapi import Request
 from datetime import datetime, timedelta
-from typing import Optional, Union
+from typing import List, Optional, Union
 import logging 
 
 app = FastAPI()
@@ -168,6 +168,42 @@ async def read_users_me(current_user: dict = Depends(get_current_user)):
     # Access the current user
     return current_user
 
+@app.get("/user/info")
+async def get_current_user_info(current_user: dict = Depends(get_current_user)):
+    role=current_user['role']
+    if role == 'user':
+        user = users_collection.find_one({"username":current_user['username'] })
+        return User(**user)
+    if role == "doctor":
+        doctor = doctors_collection.find_one({"username": current_user['username']}) 
+        return Doctor(**doctor)
+@app.get("/get_user/{username}")
+async def get_user(username:str,current_user: dict = Depends(get_current_user)):
+    # Check if the current user is a patient
+    if current_user['role'] == "user":
+        raise HTTPException(
+            status_code=403,
+            detail="Only Doctors can see patient info",
+        )
+    
+        # Check if the specified user is in the doctor's patients list
+    doctor = doctors_collection.find_one({"username": current_user['username']})
+    if doctor and "patients" in doctor and username in doctor["patients"]:
+        # User is in the doctor's patients list, retrieve and return the user's information
+        user = users_collection.find_one({"username": username})
+        if user:
+            return User(**user)
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="User not found",
+            )
+    else:
+        raise HTTPException(
+            status_code=403,
+            detail="You can only view information of your patients",
+        )
+    
 
 # @app.get("/users/{username}")
 # async def get_user(username: str):
@@ -298,3 +334,7 @@ async def select_pending_user(request: Request, current_doctor: dict = Depends(g
 
     return {"message": "Patient Added Successfully"}
 
+@app.get("/get_doctors", response_model=List[Doctor])
+async def get_doctors():
+    doctors = list(doctors_collection.find())
+    return doctors
