@@ -109,23 +109,30 @@ async def register(request:Request):
             username=data["username"],
             password=data["password"],
             email=data["email"],
-            role=data["role"]
         )
         if doctors_collection.find_one({"username": data['username']}):
             raise HTTPException(status_code=400, detail="Username already registered")
         doctors_collection.insert_one(doctor.dict())
-        return 'Registered !'
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub": data["username"] ,"role": data['role']}, expires_delta=access_token_expires
+        )   
+        return {"access_token": access_token, "token_type": "bearer"}
     else: 
         user = User(
         username=data["username"],
         password=data['password'],
         email=data["email"],
-        role=data.get("role", "user"),
         emergencyContactEmail=data["emergencyContactEmail"],
         health_data=HealthData(**data["health_data"]))
         if users_collection.find_one({"username": data["username"]}):
             raise HTTPException(status_code=400, detail="Username already registered")
         users_collection.insert_one(user.dict())
+        access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        access_token = create_access_token(
+            data={"sub":data["username"] ,"role": data['role']}, expires_delta=access_token_expires
+        )   
+        return {"access_token": access_token, "token_type": "bearer"}
 
     # if data["role"]== "user" and "DoctorContact" in data:
     #     doctor_username = data["DoctorContact"]
@@ -135,7 +142,6 @@ async def register(request:Request):
     #         users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
     #     else:
     #         user.DoctorContact = ""
-        return 'Registered !'
 
     
 # Login and create token to set the cookie
@@ -347,3 +353,17 @@ async def select_pending_user(request: Request, current_doctor: dict = Depends(g
 async def get_doctors():
     doctors = list(doctors_collection.find())
     return doctors
+
+
+# @app.post('/predict')
+# async def predict_heart_attack(request: Request):
+#     # Convert input data to a numpy array for prediction
+#     data = await request.json()
+#     data_dict = {key: int(value) for key, value in data.items()}
+ 
+#     loaded_rf_model = joblib.load('rf_model_73.joblib')
+
+#     # Make predictions using the loaded model
+#     prediction = loaded_rf_model.predict(preprocess(data_dict))
+#     # Return the prediction as a response
+#     return {"prediction": int(prediction)}
