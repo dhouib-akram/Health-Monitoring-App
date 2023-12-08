@@ -1,9 +1,9 @@
-import json
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from pymongo import MongoClient
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from entity.User import User,HealthData
@@ -14,10 +14,18 @@ from fastapi.responses import JSONResponse, Response
 from fastapi import Request
 from datetime import datetime, timedelta
 from typing import List, Optional, Union
-import logging 
+import joblib
+import sys
+
+sys.path.append("..")
+
+from heart_attack_prediction.preprocess.preprocess_data import preprocess
 
 app = FastAPI()
-
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*']
+)
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -134,14 +142,6 @@ async def register(request:Request):
         )   
         return {"access_token": access_token, "token_type": "bearer"}
 
-    # if data["role"]== "user" and "DoctorContact" in data:
-    #     doctor_username = data["DoctorContact"]
-    #     existing_doctor = doctors_collection.find_one({"username": doctor_username})
-    #     if existing_doctor:
-    #         doctors_collection.update_one({"username": doctor_username}, {"$push": {"patients": user.username}})
-    #         users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
-    #     else:
-    #         user.DoctorContact = ""
 
     
 # Login and create token to set the cookie
@@ -355,15 +355,15 @@ async def get_doctors():
     return doctors
 
 
-# @app.post('/predict')
-# async def predict_heart_attack(request: Request):
-#     # Convert input data to a numpy array for prediction
-#     data = await request.json()
-#     data_dict = {key: int(value) for key, value in data.items()}
+@app.post('/predict')
+async def predict_heart_attack(request: Request):
+    # Convert input data to a numpy array for prediction
+    data = await request.json()
+    data_dict = {key: int(value) for key, value in data.items()}
  
-#     loaded_rf_model = joblib.load('rf_model_73.joblib')
+    loaded_rf_model = joblib.load('rf_model_73.joblib')
 
-#     # Make predictions using the loaded model
-#     prediction = loaded_rf_model.predict(preprocess(data_dict))
-#     # Return the prediction as a response
-#     return {"prediction": int(prediction)}
+    # Make predictions using the loaded model
+    prediction = loaded_rf_model.predict(preprocess(data_dict))
+    # Return the prediction as a response
+    return {"prediction": int(prediction)}
