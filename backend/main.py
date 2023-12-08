@@ -97,12 +97,12 @@ db = client["HealthData"]
 users_collection = db["Users"]
 doctors_collection = db["Doctors"]
 
-
+# Register a new user to a data base (doctor or user)
 @app.post("/register")
 async def register(request:Request):
     # Check if the username already exists
     data = await request.json()
-        #measures=entity.Measures(**data.get(data["measures"], {})),
+
     if data["role"] == "doctor":
 
         doctor = Doctor(
@@ -122,24 +122,23 @@ async def register(request:Request):
         email=data["email"],
         role=data.get("role", "user"),
         emergencyContactEmail=data["emergencyContactEmail"],
-        DoctorContact= data.get(data["DoctorContact"],""),
         health_data=HealthData(**data["health_data"]))
         if users_collection.find_one({"username": data["username"]}):
             raise HTTPException(status_code=400, detail="Username already registered")
         users_collection.insert_one(user.dict())
 
-    if data["role"]== "user" and "DoctorContact" in data:
-        doctor_username = data["DoctorContact"]
-        existing_doctor = doctors_collection.find_one({"username": doctor_username})
-        if existing_doctor:
-            doctors_collection.update_one({"username": doctor_username}, {"$push": {"patients": user.username}})
-            users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
-        else:
-            user.DoctorContact = ""
+    # if data["role"]== "user" and "DoctorContact" in data:
+    #     doctor_username = data["DoctorContact"]
+    #     existing_doctor = doctors_collection.find_one({"username": doctor_username})
+    #     if existing_doctor:
+    #         doctors_collection.update_one({"username": doctor_username}, {"$push": {"patients": user.username}})
+    #         users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
+    #     else:
+    #         user.DoctorContact = ""
         return 'Registered !'
 
     
-# Updated login path to set the cookie
+# Login and create token to set the cookie
 @app.post("/login")
 async def login(request: Request):
     # Validate username and password (compare hashed password with stored hash)
@@ -163,11 +162,12 @@ async def login(request: Request):
     else :
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     
+# Access the current user's information username and role 
 @app.get("/user/me/")
 async def read_users_me(current_user: dict = Depends(get_current_user)):
-    # Access the current user
     return current_user
 
+#This endpoint retrieves and returns information about the currently logged-in user
 @app.get("/user/info")
 async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     role=current_user['role']
@@ -177,6 +177,10 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
     if role == "doctor":
         doctor = doctors_collection.find_one({"username": current_user['username']}) 
         return Doctor(**doctor)
+
+    #This endpoint allows doctors to retrieve information about a specific user, but only if the user is in their list of patients; 
+    # otherwise, it raises an error indicating that only the doctor's patients' information is accessible.
+
 @app.get("/get_user/{username}")
 async def get_user(username:str,current_user: dict = Depends(get_current_user)):
     # Check if the current user is a patient
@@ -204,21 +208,21 @@ async def get_user(username:str,current_user: dict = Depends(get_current_user)):
             detail="You can only view information of your patients",
         )
     
+#This endpoint retrieves a list of pending invitations, 
+# either pending doctors for a user or pending patients for a doctor, based on the user's role.
+@app.get('/pending_invitations')
+async def get_pending_invitations(current_user: dict = Depends(get_current_user)):
+    role=current_user['role']
+    if role == 'user':
+        user = users_collection.find_one({"username":current_user['username'] })
+        return user['pending_doctors']
+    if role == "doctor":
+        doctor = doctors_collection.find_one({"username": current_user['username']}) 
+        return doctor['pending_patient']
 
-# @app.get("/users/{username}")
-# async def get_user(username: str):
-#     user = users_collection.find_one({"username": username})
-    
-#     if user:
-#         return {
-#             "username": user["username"],
-#             "password": user["password"],
-#             "email": user["email"],
-#             "emergencyContactEmail": user["emergencyContactEmail"]
-#         }
-#     else:
-#         raise HTTPException(status_code=404, detail="User not found")
-    
+#This endpoint allows a patient to send a request to add a doctor.
+#  It checks if the doctor exists, and if so, adds the patient to the doctor's pending list and the doctor to the user's pending doctors list.
+#  The request is marked as pending, awaiting the doctor's approval.
 
 @app.post("/add_doctor/{doctor_username}")
 async def add_doctor(
@@ -255,6 +259,10 @@ async def add_doctor(
         {"$addToSet": {"pending_doctors": doctor_username}},
     )
     return "Request is pending"
+
+#This endpoint allows a doctor to accept or decline a pending patient request.
+#If accepted, it adds the patient to the doctor's patients list and the doctor to the patient's doctors list. 
+#It removes the patient from the doctor's pending list and the doctor from the patient's pending doctors list (if status is acepted/declined).
 
 @app.post("/select_pending_user")
 async def select_pending_user(request: Request, current_doctor: dict = Depends(get_current_user)):
@@ -334,6 +342,7 @@ async def select_pending_user(request: Request, current_doctor: dict = Depends(g
 
     return {"message": "Patient Added Successfully"}
 
+#This endpoint retrieves a list of all doctors in the database
 @app.get("/get_doctors", response_model=List[Doctor])
 async def get_doctors():
     doctors = list(doctors_collection.find())
