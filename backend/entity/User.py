@@ -12,8 +12,6 @@ class HealthData(BaseModel):
     height: int
     weight: int
     gender: int
-    ap_hi: int
-    ap_lo: int
     cholesterol: int
     gluc: int
     smoke: int
