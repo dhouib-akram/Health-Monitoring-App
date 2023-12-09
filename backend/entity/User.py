@@ -24,7 +24,7 @@ class SensorData(BaseModel):
     ap_lo: int = 80  
     saturation_data: int = 78  
     heart_rate_data: int = 60  
-    temp:37
+    temp:int = 37
 
 
 class User(BaseModel):

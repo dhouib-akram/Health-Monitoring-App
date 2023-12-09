@@ -10,12 +10,46 @@ import TeamSwitcher from "./team_switcher";
 import { Input } from "../ui/input";
 import { MainNav } from "./main_nav";
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
-import { HeartPulse } from 'lucide-react';
+import { CalendarDays, HeartPulse, GaugeCircle, Wind, Scale } from 'lucide-react';
 import { Thermometer } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, Legend, ResponsiveContainer, AreaChart, XAxis, YAxis, Area, LineChart, CartesianGrid, Line } from "recharts";
 import { CircularProgressbar, buildStyles } from 'react-circular-progressbar';
 import 'react-circular-progressbar/dist/styles.css';
 import { MyDoctors } from "./my_doctors";
+import { useEffect, useState } from "react";
+import { UserSheet } from "../user_Sheet";
+
+interface HealthData {
+    age: number;
+    height: number;
+    weight: number;
+    gender: number;
+    cholesterol: number;
+    gluc: number;
+    smoke: number;
+    alco: number;
+    active: number;
+}
+
+interface Measure {
+    ap_hi: number;
+    ap_lo: number;
+    saturation_data: number;
+    heart_rate_data: number;
+    temp: number;
+}
+
+interface User {
+    username: string;
+    email: string;
+    emergencyContactEmail: string;
+    health_data: HealthData;
+    pending_doctors: any[]; // Change this to the actual type if it's not an array of any
+    doctors: any[]; // Change this to the actual type if it's not an array of any
+    measure: Measure[];
+    prediction: number;
+    health_status: Record<string, any>; // Change this to the actual type if it's not an empty object
+}
 export default function Dashboard() {
     const areadata = [
         {
@@ -54,8 +88,49 @@ export default function Dashboard() {
             "recent_week": 5400
         },
     ];
+    const token = localStorage.getItem('access_token');
+    const [user, setUser] = useState<User>();
+    useEffect(() => {
+        const fetchdata = async () => {
+            const response = await fetch('http://127.0.0.1:8000/user/info', {
+                headers: {
+                    'Content-Type': 'application/json', // Adjust the content type if needed,
+                    'Authorization': `Bearer ${token}`
+                }
+            });
+            if (response.status !== 200) {
+            }
+            const responseBody = await response.json();
+            console.log(responseBody)
+            setUser(responseBody)
+        }
+        fetchdata();
+    }, [token]);
+
+    const [open, setOpen] = useState(false)
     return (
         <>
+            <div className="border-b bg-white">
+                <div className="flex h-16 items-center px-4">
+                    <MainNav className="mx-6" />
+                    <div className="ml-auto flex items-center space-x-4">
+                        <Button variant='ghost' onClick={async () => {
+                            await setOpen(true)
+                            document.getElementById('user_sheet_btn')!.click()
+                        }}>
+                            <CalendarDays />
+                        </Button>
+                        <div>
+                            <Input
+                                type="search"
+                                placeholder="Search..."
+                                className="md:w-[100px] lg:w-[300px]"
+                            />
+                        </div>
+                        <UserNav />
+                    </div>
+                </div>
+            </div>
             <div className="flex-col md:flex bg-gray-100">
                 <div className="flex-1 space-y-4 p-8 pt-6">
                     <div className="flex items-center justify-between space-y-2">
@@ -79,13 +154,18 @@ export default function Dashboard() {
                                             </div>
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <p className=" font-semibold text-lg"><span className="text-red-700">110 BPM</span> </p>
+                                                <p className=" font-semibold text-lg">
+                                                    <span className="text-black-800">{user?.measure[user?.measure?.length - 1]?.heart_rate_data} BPM</span>
+                                                </p>
                                             </div>
                                         </div>
-                                        <div className=" mt-10 flex items-center justify-center">
-                                            <h2 className=" font-bold text-red-800">You are getting a heart attack you should see a doctor now !</h2>
-                                        </div>
+
                                     </CardContent>
+                                    <CardFooter className=" flex items-center justify-center">
+                                        <div className=" mt-10 flex items-center justify-center">
+                                            {user?.health_status?.heart_rate_status === 'Moderate' && (<h2 className=" font-bold text-green-800">{user?.health_status?.bmi_status}</h2>)}
+                                        </div>
+                                    </CardFooter>
                                 </Card>
                                 <Card>
                                     <CardContent className="m-4">
@@ -96,35 +176,40 @@ export default function Dashboard() {
                                                     <AvatarFallback>SC</AvatarFallback>
                                                 </Avatar>
                                             </div>
-                                            <div className="flex items-center mt-2">
-                                                <h2 className="font-semibold">Saif Ben Hmida</h2>
+                                            <div className="flex items-center mt-2 justify-center">
+                                                <h2 className="font-semibold">{user?.username}</h2>
+                                            </div>
+                                            <div className="flex items-center mt-2 justify-center">
+                                                <h2 className="font-semibold" ><span className=" text-gray-500">Emergency Contact : </span>{user?.emergencyContactEmail || 'ieee@supcom.tn'} </h2>
                                             </div>
                                         </div>
                                         <div className=" mt-3 grid grid-cols-2 gap-4 items-center justify-center">
                                             {/* Column 1 */}
                                             <div className="flex flex-col items-center border-r border-gray-300 pr-4">
                                                 <h3 className="mb-2 text-gray-500">Age</h3>
-                                                <p className=" font-semibold">24</p>
+                                                <p className=" font-semibold">{user?.health_data?.age}</p>
                                             </div>
 
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <h3 className="mb-2  text-gray-500">Blood</h3>
-                                                <p className=" font-semibold">A+</p>
+                                                <h3 className="mb-2  text-gray-500">Gender</h3>
+                                                {user?.health_data.gender === 2 && (<p className=" font-semibold">Men</p>)}
+                                                {user?.health_data.gender === 1 && (<p className=" font-semibold">Women</p>)}
                                             </div>
                                             {/* Column 1 */}
                                             <div className="flex flex-col items-center border-r border-gray-300 pr-4">
                                                 <h3 className="mb-2 text-gray-500">Weight</h3>
-                                                <p className=" font-semibold">75</p>
+                                                <p className=" font-semibold">{user?.health_data.weight}</p>
                                             </div>
 
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
                                                 <h3 className="mb-2  text-gray-500">Height</h3>
-                                                <p className=" font-semibold">1.78m</p>
+                                                <p className=" font-semibold">{user?.health_data.height}</p>
                                             </div>
                                         </div>
                                     </CardContent>
+
                                 </Card>
                                 <Card>
                                     <CardHeader>
@@ -140,103 +225,99 @@ export default function Dashboard() {
                                             </div>
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <p className=" font-semibold text-lg"><span className="text-green-700">36°C</span> </p>
+                                                <p className=" font-semibold text-lg"><span className="text-black-800">{user?.measure[user?.measure?.length - 1]?.temp}°C</span> </p>
                                             </div>
                                         </div>
-                                        <div className=" mt-10 flex items-center justify-center">
-                                            <h2 className=" font-bold text-green-800">Your temperature is normal and healthy!</h2>
-                                        </div>
                                     </CardContent>
+                                    <CardFooter className="flex items-center justify-center">
+                                        <div className=" mt-10 flex items-center justify-center">
+                                            <h2 className=" font-bold text-green-800">Good</h2>
+                                        </div>
+                                    </CardFooter>
                                 </Card>
-                                <Card className="lg:col-span-2" >
-                                    <CardHeader className="flex flex-row items-center justify-center space-y-0 pb-2">
-                                        <CardTitle className="text-sm font-medium">
-                                            Your Health Conditions
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            BMI
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="mt-8 h-56">
-                                        <ResponsiveContainer width="100%" height="100%" >
-                                            <AreaChart data={areadata}
-                                                margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                                                <defs>
-                                                    <linearGradient id="colorUv" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#8884d8" stopOpacity={0.8} />
-                                                        <stop offset="95%" stopColor="#8884d8" stopOpacity={0} />
-                                                    </linearGradient>
-                                                    <linearGradient id="colorPv" x1="0" y1="0" x2="0" y2="1">
-                                                        <stop offset="5%" stopColor="#82ca9d" stopOpacity={0.8} />
-                                                        <stop offset="95%" stopColor="#82ca9d" stopOpacity={0} />
-                                                    </linearGradient>
-                                                </defs>
-                                                <XAxis dataKey="day" />
-                                                <YAxis />
-                                                <Tooltip />
-                                                <Area type="monotone" dataKey="last_week" stroke="#8884d8" fillOpacity={1} fill="url(#colorUv)" />
-                                                <Area type="monotone" dataKey="recent_week" stroke="#82ca9d" fillOpacity={1} fill="url(#colorPv)" />
-                                            </AreaChart>
-                                        </ResponsiveContainer>
-                                    </CardContent>
-                                </Card>
-                                <Card className="w-full">
-                                    <CardContent className="mt-11">
-                                        <div className="flex  items-center justify-between m-4 space-x-4">
-                                            <div className="">
-                                                <h1 className="text-center font-semibold sm:text-xs lg:text-lg">General</h1>
-                                                <CircularProgressbar className="mt-11" value={66} text={`${66}%`} styles={buildStyles({
-                                                    // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-                                                    strokeLinecap: 'butt',
-                                                    // Text size
-                                                    textSize: '16px',
-                                                    // How long animation takes to go from one percentage to another, in seconds
-                                                    pathTransitionDuration: 0.5,
-                                                    // Can specify path transition in more detail, or remove it entirely
-                                                    // pathTransition: 'none',
-                                                    // Colors
-                                                    pathColor: `#DB0F27`,
-                                                    textColor: '#C0C0C0',
-                                                    trailColor: '#d6d6d6',
-                                                    backgroundColor: '#3e98c7',
-                                                })} />
+                                    <CardContent className="m-4 grid items-center">
+                                        <div className=" mt-3 grid grid-cols-2 gap-4 items-center justify-center">
+                                            {/* Column 1 */}
+                                            <div className="flex flex-col items-center border-r border-gray-300 pr-4">
+                                                <Scale className="h-20 w-20  text-cyan-700" />
                                             </div>
-                                            <div >
-                                                <h1 className="text-center font-semibold sm:text-xs lg:text-lg ">Oxygyne level</h1>
-                                                <CircularProgressbar className="mt-11" value={95} text={`${95}%`} styles={buildStyles({
-                                                    // Whether to use rounded or flat corners on the ends - can use 'butt' or 'round'
-                                                    strokeLinecap: 'butt',
-
-                                                    // Text size
-                                                    textSize: '16px',
-
-                                                    // How long animation takes to go from one percentage to another, in seconds
-                                                    pathTransitionDuration: 0.5,
-
-                                                    // Can specify path transition in more detail, or remove it entirely
-                                                    // pathTransition: 'none',
-
-                                                    // Colors
-                                                    pathColor: `#0583D2`,
-                                                    textColor: '#C0C0C0',
-                                                    trailColor: '#d6d6d6',
-                                                    backgroundColor: '#3e98c7',
-                                                })} />
+                                            {/* Column 2 */}
+                                            <div className="flex flex-col items-center pl-4">
+                                                <p className=" font-semibold text-lg"><span className="text-black-800">{parseFloat(user?.health_status?.bmi).toFixed(2)}</span> </p>
                                             </div>
                                         </div>
-
                                     </CardContent>
+                                    <CardFooter className="flex items-center justify-center">
+                                        <div className=" mt-10 flex items-center justify-center">
+                                            {user?.health_status?.bmi_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.bmi_status}</h2>)}
+                                            {user?.health_status?.bmi_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{user?.health_status?.bmi_status}</h2>)}
+                                        </div>
+                                    </CardFooter>
                                 </Card>
-                                {/* <Card className="">
+                                <Card>
                                     <CardHeader>
-                                        <CardTitle>My Doctors</CardTitle>
+                                        <CardTitle>
+                                            systolic and diastolic pressure
+                                        </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="">
-                                        <MyDoctors />
+                                    <CardContent className="m-4 grid items-center">
+                                        <div className=" mt-3 grid grid-cols-2 gap-4 items-center justify-center">
+                                            {/* Column 1 */}
+                                            <div className="flex flex-col items-center border-r border-gray-300 pr-4">
+                                                <GaugeCircle className="h-20 w-20  text-cyan-700" />
+                                            </div>
+                                            {/* Column 2 */}
+                                            <div className="flex flex-col items-center pl-4">
+                                                <p className=" font-semibold text-lg"><span className="text-black-700 text-left"><span className=" text-gray-500">sys:</span> {user?.measure[user?.measure?.length - 1]?.ap_hi}</span> </p>
+                                                <p className=" font-semibold text-lg"><span className="text-black-700 text-left"><span className=" text-gray-500">dia:</span> {user?.measure[user?.measure?.length - 1]?.ap_lo}</span> </p>
+                                            </div>
+                                        </div>
                                     </CardContent>
-                                </Card> */}
+                                    <CardFooter className="flex items-center justify-center">
+                                        <div className=" mt-10 flex items-center justify-center">
+                                            {user?.health_status?.blood_pressure_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.blood_pressure_status}</h2>)}
+                                            {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.blood_pressure_status}</h2>)}
+                                        </div>
+                                    </CardFooter>
+                                </Card>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle>
+                                            Oxygyne level
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="m-4 grid items-center">
+                                        <div className=" mt-3 grid grid-cols-2 gap-4 items-center justify-center">
+                                            {/* Column 1 */}
+                                            <div className="flex flex-col items-center border-r border-gray-300 pr-4">
+                                                <Wind className="h-20 w-20  text-cyan-700" />
+                                            </div>
+                                            {/* Column 2 */}
+                                            <div className="flex flex-col items-center pl-4">
+                                                <p className=" font-semibold text-lg"><span className="text-black-700">{user?.measure[user?.measure?.length - 1]?.saturation_data}%</span> </p>
+                                            </div>
+                                        </div>
+                                    </CardContent>
+                                    <CardFooter className="flex items-center justify-center">
+                                        <div className=" mt-10 flex items-center justify-center">
+                                            {user?.health_status?.blood_pressure_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.blood_pressure_status}</h2>)}
+                                            {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{user?.health_status?.blood_pressure_status}</h2>)}
+                                        </div>
+                                    </CardFooter>
+                                </Card>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+            {open && (<UserSheet />)}
+
         </>
     )
 }
