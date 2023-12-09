@@ -32,12 +32,14 @@ mqtt_command_topic = "device/command"
 
 # Create a dictionary to store the data
 sensor_data = {
-    "ap_hi": 0,
-    "ap_lo":0,
-    "saturation_data": 0,
-    "heart_rate_data": 0
+    "ap_hi": 100,
+    "ap_lo":80,
+    "saturation_data": 95,
+    "heart_rate_data": 60,
+    "temp":37
 }
 sensor_data_lock = threading.Lock()
+
 
 def update_sensor_data(msg):
     with sensor_data_lock:
@@ -50,7 +52,8 @@ def update_sensor_data(msg):
             sensor_data["saturation_data"] = saturation_value
         elif msg.topic == mqtt_heart_rate_topic:
             sensor_data["heart_rate_data"] = int(msg.payload.decode().split(":")[1])
-
+        elif msg.topic == mqtt_heart_rate_topic:
+            sensor_data["temp"] = int(msg.payload.decode().split(":")[1])
 # Callback when the client connects to the broker
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
@@ -85,7 +88,7 @@ def verify_password(entered_password, hashed_password):
     return bcrypt.checkpw(entered_password.encode('utf-8'), hashed_password.encode('utf-8'))
 SECRET_KEY = "IYAwM+O69b20dBSjHAiBeX6NdHu6Ca9nklSc8A+cn9Y="
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES=30
+ACCESS_TOKEN_EXPIRE_MINUTES=3000
 # OAuth2PasswordBearer is used to get the token from the request
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 # Function to create an access token
@@ -522,6 +525,7 @@ def get_health_status(health_data: Dict,measure_data: Dict):
         pressure_status = "High"
     elif ap_hi <= 90 or ap_lo <= 60:
         pressure_status = "Low"
+    
 
     # Analyze Saturation Data
     saturation_data = measure_data.get("saturation_data", 0)
@@ -529,16 +533,41 @@ def get_health_status(health_data: Dict,measure_data: Dict):
     saturation_status = "Normal"
     if saturation_data < 95:
         saturation_status = "Low"
-
+           # Analyze heart rate and update the health status
+    heart_rate = measure_data.get("saturation_data")
+    if 60 <= heart_rate < 100:
+        heart_stats = "Moderate"
+    elif 50 <= heart_rate < 60:
+        heart_stats = "Light"
+    elif 40 <= heart_rate < 50:
+        heart_stats = "Very Light"
+    elif 100 <= heart_rate < 120:
+        heart_stats = "Hard"
+    elif heart_rate >= 120:
+        heart_stats = "Maximum"
     # Compile the results
     health_status = {
         "bmi": bmi,
         "bmi_status": bmi_status,
         "blood_pressure_status": pressure_status,
-        "saturation_status": saturation_status
+        "saturation_status": saturation_status,
+        "heart_rate_status": heart_stats,
     }
 
-    # Store the health status back into user_data
+   
+    return health_status
+    # Endpoint to get user health status
+@app.post("/user/health-status")
+async def post_user_health_status(request: Request, current_user: dict = Depends(get_current_user)):
+    # Fetch user data from the database
+    user_data = users_collection.find_one({"username":current_user['username'] })
+    health_data = user_data.get("health_data")
+    measure_data = user_data.get("measure")[-1]
+    health_status=get_health_status(health_data,measure_data)
+     # Store the health status back into user_data
+ 
+
+        
     user_data["health_status"] = health_status
 
     # Update user data in the database
@@ -546,18 +575,7 @@ def get_health_status(health_data: Dict,measure_data: Dict):
         {"username": user_data['username']},
         {"$set": {"health_status": health_status}}
     )
-
-    return health_status
-    # Endpoint to get user health status
-@app.get("/user/health-status", response_model=Dict)
-async def get_user_health_status(request: Request, current_user: dict = Depends(get_current_user)):
-    # Fetch user data from the database
-    user_data = users_collection.find_one({"username":current_user['username'] })
-    health_data = user_data.get("health_data")
-    measure_data = user_data.get("measure")[-1]
-        
-
     # Get health status
     
 
-    return {"health_data":health_data,"measure_data":measure_data}
+    return {"health_status":health_status}

@@ -20,10 +20,11 @@ class HealthData(BaseModel):
     alco: int
     active: int
 class SensorData(BaseModel):
-    ap_hi: int = 0  
-    ap_lo: int = 0  
-    saturation_data: int = 0  
-    heart_rate_data: int = 0  
+    ap_hi: int = 100  
+    ap_lo: int = 80  
+    saturation_data: int = 78  
+    heart_rate_data: int = 60  
+    temp:37
 
 
 class User(BaseModel):
@@ -57,7 +58,7 @@ class User(BaseModel):
     def hash_password(password: str):
         salt = bcrypt.gensalt()
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
-        return hashed_password
+        return hashed_password.decode('utf-8')
 
     def update_password(self, new_password: str):
         # Hash the new password and update the password property

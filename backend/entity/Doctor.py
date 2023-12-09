@@ -33,7 +33,7 @@ class Doctor(BaseModel):
     def hash_password(password: str):
         salt = bcrypt.gensalt()
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
-        return hashed_password
+        return  hashed_password.decode('utf-8')
 
     def update_password(self, new_password: str):
         # Hash the new password and update the password property
