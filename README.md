@@ -78,8 +78,9 @@ Our application integrates with various sensors to gather essential health data.
 
    ```bash
    git clone https://github.com/your-username/your-repo.git
-   cd backend
    pip install -r requirements.txt
+   cd backend
+
    uvicorn main:app --reload
    ```
 2. For the frontend, kidnly follow these steps:
