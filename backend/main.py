@@ -13,7 +13,7 @@ from fastapi import Depends, HTTPException,status
 from fastapi.responses import JSONResponse, Response
 from fastapi import Request
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
+from typing import Dict, List, Optional, Union
 import joblib
 import sys
 import bcrypt
@@ -418,36 +418,37 @@ async def get_sensor_data(current_user: dict = Depends(get_current_user)):
         raise HTTPException(
             status_code=403,
             detail="Only users can measure")
-    else:
-        
-
+    else: 
+    
         mqtt_client = mqtt.Client()
-    # Set the callbacks
+        # Set the callbacks
         mqtt_client.on_connect = on_connect
         mqtt_client.on_message = on_message  
 
         try:
-        # Connect to the MQTT broker
+            # Connect to the MQTT broker
             mqtt_client.connect(broker_address, 1883, 60)
 
-        # Wait for the connection to establish
+            # Wait for the connection to establish
             mqtt_client.loop_start()
             while not mqtt_client.is_connected():
                 time.sleep(1)
 
-        # Wait for a short duration to receive messages
-            time.sleep(20)  
+            # Wait for a short duration to receive messages
+            time.sleep(1)  
 
         finally:
-        # Disconnect from the MQTT broker
+            # Disconnect from the MQTT broker
             mqtt_client.loop_stop()
 
         with sensor_data_lock:
             # return sensor_data
+            print(sensor_data)
+            print(type(sensor_data))
             users_collection.update_one(
                 {"username": current_user['username']},
                 {
-                 "$addToSet": {"measure": sensor_data},
+                    "$addToSet": {"measure": sensor_data},
                 })
             return "done"
 # Function to formulate JSON structure for prediction
@@ -493,3 +494,70 @@ async def predict_heart_attack( current_user: dict = Depends(get_current_user)):
     )
     # Return the prediction as a response
     return {"prediction": int(prediction)}
+
+# Function to get health status
+def get_health_status(health_data: Dict,measure_data: Dict):
+   
+
+    # Calculate BMI
+    bmi = health_data.get("weight", 0) / ((health_data.get("height", 0) / 100) ** 2)
+
+    # Analyze BMI
+    bmi_status = "Normal"
+    if bmi < 18.5:
+        bmi_status = "Underweight"
+    elif 18.5 <= bmi < 24.9:
+        bmi_status = "Normal"
+    elif 25 <= bmi < 29.9:
+        bmi_status = "Overweight"
+    elif bmi >= 30:
+        bmi_status = "Obese"
+
+    # Analyze Blood Pressure
+    ap_hi = measure_data.get("ap_hi", 0)
+    ap_lo = measure_data.get("ap_lo", 0)
+    
+    pressure_status = "Normal"
+    if ap_hi >= 140 or ap_lo >= 90:
+        pressure_status = "High"
+    elif ap_hi <= 90 or ap_lo <= 60:
+        pressure_status = "Low"
+
+    # Analyze Saturation Data
+    saturation_data = measure_data.get("saturation_data", 0)
+
+    saturation_status = "Normal"
+    if saturation_data < 95:
+        saturation_status = "Low"
+
+    # Compile the results
+    health_status = {
+        "bmi": bmi,
+        "bmi_status": bmi_status,
+        "blood_pressure_status": pressure_status,
+        "saturation_status": saturation_status
+    }
+
+    # Store the health status back into user_data
+    user_data["health_status"] = health_status
+
+    # Update user data in the database
+    users_collection.update_one(
+        {"username": user_data['username']},
+        {"$set": {"health_status": health_status}}
+    )
+
+    return health_status
+    # Endpoint to get user health status
+@app.get("/user/health-status", response_model=Dict)
+async def get_user_health_status(request: Request, current_user: dict = Depends(get_current_user)):
+    # Fetch user data from the database
+    user_data = users_collection.find_one({"username":current_user['username'] })
+    health_data = user_data.get("health_data")
+    measure_data = user_data.get("measure")[-1]
+        
+
+    # Get health status
+    
+
+    return {"health_data":health_data,"measure_data":measure_data}

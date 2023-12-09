@@ -1,3 +1,4 @@
+from typing import Dict, List
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel ,EmailStr
@@ -18,6 +19,12 @@ class HealthData(BaseModel):
     smoke: int
     alco: int
     active: int
+class SensorData(BaseModel):
+    ap_hi: int = 0  
+    ap_lo: int = 0  
+    saturation_data: int = 0  
+    heart_rate_data: int = 0  
+
 
 class User(BaseModel):
     username: str
@@ -25,9 +32,11 @@ class User(BaseModel):
     email: EmailStr
     emergencyContactEmail: EmailStr
     health_data: HealthData
-    pending_doctors: list[str] = []  # Include the pending_doctors field with a default empty list of usernames
-    doctors: list[str] = []  # Include the doctors field with a default empty list of usernames
-
+    pending_doctors: List[str] = []  # Include the pending_doctors field with a default empty list of usernames
+    doctors: List[str] = []  # Include the doctors field with a default empty list of usernames
+    measure: List[SensorData] =[]
+    prediction:int = 0
+    health_status: Dict = {}
     def __init__(self, **data):
         super().__init__(**data)
         self.password = self.hash_password(self.password)

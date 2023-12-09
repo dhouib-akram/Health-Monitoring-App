@@ -37,9 +37,7 @@ def transform_user_data(user_df):
 
     map_values = []
     for row in user_df['MAP']:
-        if row < 69.9:
-            map_values.append(1)  # Low
-        elif 70 <= row <= 79.9:
+        if row <79.9:
             map_values.append(2)  # Normal
         elif 80 <= row <= 89.9:
             map_values.append(3)  # Normal

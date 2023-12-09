@@ -1,3 +1,4 @@
+from typing import List
 import bcrypt
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
@@ -12,8 +13,8 @@ class Doctor(BaseModel):
     username: str
     password: str
     email: EmailStr
-    pending_patient: list[str] = []  # Include the pending_patient field with a default empty list of usernames
-    patients: list[str] = []  # Include the patients field with a default empty list of usernames
+    pending_patient: List[str] = []  # Include the pending_patient field with a default empty list of usernames
+    patients: List[str] = []  # Include the patients field with a default empty list of usernames
 
     def __init__(self, **data):
         super().__init__(**data)
