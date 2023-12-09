@@ -50,6 +50,9 @@ For doctors, we've designed a dedicated interface where they can access and revi
 - **Mosquitto Broker**:
 
   Integrated to facilitate communication between sensors and the backend, ensuring a reliable and secure exchange of data from the sensors to the server.
+  
+![Project Structure](./project_structure.png)
+
 ## Getting Started
 1. To run the backend of our application, follow these steps:
 
