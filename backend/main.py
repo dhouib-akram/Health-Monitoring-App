@@ -16,11 +16,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 import joblib
 import sys
-import bcrypt
 import paho.mqtt.client as mqtt
 
 import time
 import threading
+import bcrypt
+
 sys.path.append("..")
 broker_address = "91.121.93.94"  
 
@@ -83,6 +84,7 @@ def get_patient_data(username: str):
     return user_data
 def verify_password(entered_password, hashed_password):
     return bcrypt.checkpw(entered_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
 SECRET_KEY = "IYAwM+O69b20dBSjHAiBeX6NdHu6Ca9nklSc8A+cn9Y="
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -154,7 +156,7 @@ async def root():
     return {"Welcome to the health monitoring app"}
 
 # Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017")
+client = MongoClient("mongodb://admin:password@localhost:27017/")
 db = client["HealthData"]
 users_collection = db["Users"]
 doctors_collection = db["Doctors"]
@@ -209,11 +211,11 @@ async def login(request: Request):
     # Try to find the user in the users_collection
     if role == 'user':
         user = users_collection.find_one({"username": username})
+        print(user)
     if role == "doctor":
-        user = doctors_collection.find_one({"username": username})     
+        user = doctors_collection.find_one({"username": username})  
            
     if user and verify_password(password, user["password"]):
-      
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": user["username"] ,"role": role}, expires_delta=access_token_expires
@@ -411,7 +413,7 @@ async def get_doctors():
     return doctors
 
 # Define a route to handle the GET request without authentication
-@app.post("/getM/")
+@app.post("/getM")
 async def get_sensor_data(current_user: dict = Depends(get_current_user)):
 
     if current_user['role'] != "user":
@@ -561,3 +563,80 @@ async def get_user_health_status(request: Request, current_user: dict = Depends(
     
 
     return {"health_data":health_data,"measure_data":measure_data}
+
+
+# Function to get health status
+def get_health_status(health_data: Dict,measure_data: Dict):
+   
+
+    # Calculate BMI
+    bmi = health_data.get("weight", 0) / ((health_data.get("height", 0) / 100) ** 2)
+
+    # Analyze BMI
+    bmi_status = "Normal"
+    if bmi < 18.5:
+        bmi_status = "Underweight"
+    elif 18.5 <= bmi < 24.9:
+        bmi_status = "Normal"
+    elif 25 <= bmi < 29.9:
+        bmi_status = "Overweight"
+    elif bmi >= 30:
+        bmi_status = "Obese"
+
+    # Analyze Blood Pressure
+    ap_hi = measure_data.get("ap_hi", 0)
+    ap_lo = measure_data.get("ap_lo", 0)
+    
+    pressure_status = "Normal"
+    if ap_hi >= 140 or ap_lo >= 90:
+        pressure_status = "High"
+    elif ap_hi <= 90 or ap_lo <= 60:
+        pressure_status = "Low"
+    
+
+    # Analyze Saturation Data
+    saturation_data = measure_data.get("saturation_data", 0)
+
+    saturation_status = "Normal"
+    if saturation_data < 95:
+        saturation_status = "Low"
+           # Analyze heart rate and update the health status
+    heart_rate = measure_data.get("saturation_data", 0)
+    if 60 <= heart_rate < 100:
+        heart_stats = "Moderate"
+    elif 50 <= heart_rate < 60:
+        heart_stats = "Light"
+    elif 40 <= heart_rate < 50:
+        heart_stats = "Very Light"
+    elif 100 <= heart_rate < 120:
+        heart_stats = "Hard"
+    elif heart_rate >= 120:
+        heart_stats = "Maximum"
+    # Compile the results
+    health_status = {
+        "bmi": bmi,
+        "bmi_status": bmi_status,
+        "blood_pressure_status": pressure_status,
+        "saturation_status": saturation_status,
+        "heart_rate_status": heart_stats,
+    }
+
+   
+    return health_status
+    # Endpoint to get user health status
+@app.post("/user/health-status")
+async def post_user_health_status(request: Request, current_user: dict = Depends(get_current_user)):
+    # Fetch user data from the database
+    user_data = users_collection.find_one({"username":current_user['username'] })
+    health_data = user_data.get("health_data")
+    measure_data = user_data.get("measure")[-1]
+    health_status=get_health_status(health_data,measure_data)
+     # Store the health status back into user_data
+ 
+
+        
+
+    # Get health status
+    
+
+    return {"health_status":health_status}
