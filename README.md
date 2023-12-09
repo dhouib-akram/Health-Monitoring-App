@@ -5,18 +5,10 @@ Brief description or tagline for your project.
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Features](#features)
 - [Technologies Used](#technologies-used)
 - [Getting Started](#getting-started)
-  - [Prerequisites](#prerequisites)
-  - [Installation](#installation)
-- [Configuration](#configuration)
-- [Usage](#usage)
-- [API Documentation](#api-documentation)
-- [Database](#database)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgements](#acknowledgements)
+- [Security](#security)
+- [Demo](#demo)
 
 ## Introduction
 
