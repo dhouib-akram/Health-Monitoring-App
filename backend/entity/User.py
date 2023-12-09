@@ -2,8 +2,9 @@ from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from pydantic import BaseModel ,EmailStr
 
+import bcrypt
 
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 
 from pydantic import BaseModel
 
@@ -24,11 +25,12 @@ class User(BaseModel):
     email: EmailStr
     emergencyContactEmail: EmailStr
     health_data: HealthData
-
+    pending_doctors: list[str] = []  # Include the pending_doctors field with a default empty list of usernames
+    doctors: list[str] = []  # Include the doctors field with a default empty list of usernames
 
     def __init__(self, **data):
         super().__init__(**data)
-        self.password = self.hash_pass(self.password)
+        self.password = self.hash_password(self.password)
 
     def get_username(self): 
         return self.username
@@ -43,8 +45,10 @@ class User(BaseModel):
         return self.emergencyContactEmail
 
     @staticmethod
-    def hash_pass(password: str):
-        return pwd_context.hash(password)
+    def hash_password(password: str):
+        salt = bcrypt.gensalt()
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), salt)
+        return hashed_password
 
     def update_password(self, new_password: str):
         # Hash the new password and update the password property
