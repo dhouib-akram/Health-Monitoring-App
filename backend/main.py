@@ -1,9 +1,9 @@
-import json
 from fastapi import Depends, FastAPI, HTTPException
 from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel
 from pymongo import MongoClient
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import OAuth2PasswordBearer
 from passlib.context import CryptContext
 from entity.User import User,HealthData
@@ -13,14 +13,76 @@ from fastapi import Depends, HTTPException,status
 from fastapi.responses import JSONResponse, Response
 from fastapi import Request
 from datetime import datetime, timedelta
-from typing import List, Optional, Union
-import logging 
+from typing import Dict, List, Optional, Union
+import joblib
+import sys
+import bcrypt
+import paho.mqtt.client as mqtt
+
+import time
+import threading
+sys.path.append("..")
+broker_address = "91.121.93.94"  
+
+# MQTT topics to subscribe to
+mqtt_pressure_topic = "device/data/pressure"
+mqtt_saturation_topic = "device/data/saturation"
+mqtt_heart_rate_topic = "device/data/heartRate"
+mqtt_command_topic = "device/command"
+
+# Create a dictionary to store the data
+sensor_data = {
+    "ap_hi": 0,
+    "ap_lo":0,
+    "saturation_data": 0,
+    "heart_rate_data": 0
+}
+sensor_data_lock = threading.Lock()
+
+def update_sensor_data(msg):
+    with sensor_data_lock:
+        if msg.topic == mqtt_pressure_topic:
+            sensor_data["ap_hi"] = int(msg.payload.decode().split(":")[1])
+        elif msg.topic == mqtt_pressure_topic:
+            sensor_data["ap_lo"] = int(msg.payload.decode().split(":")[1])
+        elif msg.topic == mqtt_saturation_topic:
+            saturation_value = int(msg.payload.decode().split(":")[1])
+            sensor_data["saturation_data"] = saturation_value
+        elif msg.topic == mqtt_heart_rate_topic:
+            sensor_data["heart_rate_data"] = int(msg.payload.decode().split(":")[1])
+
+# Callback when the client connects to the broker
+def on_connect(client, userdata, flags, rc):
+    print(f"Connected with result code {rc}")
+    client.publish(mqtt_command_topic, "1")
+    client.subscribe([(mqtt_pressure_topic, 0), (mqtt_saturation_topic, 0), (mqtt_heart_rate_topic, 0)])
+
+
+def on_message(client, userdata, msg):
+    print(f"Received message from topic '{msg.topic}': {msg.payload.decode()}")
+    update_sensor_data(msg)
+sys.path.append("..")
+
+from heart_attack_prediction.preprocess.preprocess_data import preprocess
 
 app = FastAPI()
+# Allow all origins and set CORS headers.
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=['*'],
+    allow_credentials=True, 
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-
-
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+# Function to fetch user data from the database
+def get_patient_data(username: str):
+    user_data = users_collection.find_one({"username": username})
+    if not user_data:
+        raise HTTPException(status_code=404, detail="User not found")
+    return user_data
+def verify_password(entered_password, hashed_password):
+    return bcrypt.checkpw(entered_password.encode('utf-8'), hashed_password.encode('utf-8'))
 SECRET_KEY = "IYAwM+O69b20dBSjHAiBeX6NdHu6Ca9nklSc8A+cn9Y="
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=30
@@ -134,14 +196,6 @@ async def register(request:Request):
         )   
         return {"access_token": access_token, "token_type": "bearer"}
 
-    # if data["role"]== "user" and "DoctorContact" in data:
-    #     doctor_username = data["DoctorContact"]
-    #     existing_doctor = doctors_collection.find_one({"username": doctor_username})
-    #     if existing_doctor:
-    #         doctors_collection.update_one({"username": doctor_username}, {"$push": {"patients": user.username}})
-    #         users_collection.update_one({"username": user.username}, {"$push": {"doctors": doctor_username}})
-    #     else:
-    #         user.DoctorContact = ""
 
     
 # Login and create token to set the cookie
@@ -149,8 +203,8 @@ async def register(request:Request):
 async def login(request: Request):
     # Validate username and password (compare hashed password with stored hash)
     data = await request.json()
-    username = data.get("username")
-    password = data.get("password")
+    username = data["username"]
+    password = data["password"]
     role = get_role(username)
     # Try to find the user in the users_collection
     if role == 'user':
@@ -158,7 +212,7 @@ async def login(request: Request):
     if role == "doctor":
         user = doctors_collection.find_one({"username": username})     
            
-    if user and pwd_context.verify(password, user["password"]):
+    if user and verify_password(password, user["password"]):
       
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
@@ -169,7 +223,7 @@ async def login(request: Request):
         raise HTTPException(status_code=400, detail="Incorrect username or password")
     
 # Access the current user's information username and role 
-@app.get("/user/me/")
+@app.get("/")
 async def read_users_me(current_user: dict = Depends(get_current_user)):
     return current_user
 
@@ -186,7 +240,9 @@ async def get_current_user_info(current_user: dict = Depends(get_current_user)):
 
     #This endpoint allows doctors to retrieve information about a specific user, but only if the user is in their list of patients; 
     # otherwise, it raises an error indicating that only the doctor's patients' information is accessible.
-
+@app.get("/user/me/")
+async def read_users_me(current_user: dict = Depends(get_current_user)):
+    return current_user
 @app.get("/get_user/{username}")
 async def get_user(username:str,current_user: dict = Depends(get_current_user)):
     # Check if the current user is a patient
@@ -354,16 +410,154 @@ async def get_doctors():
     doctors = list(doctors_collection.find())
     return doctors
 
+# Define a route to handle the GET request without authentication
+@app.post("/getM/")
+async def get_sensor_data(current_user: dict = Depends(get_current_user)):
 
-# @app.post('/predict')
-# async def predict_heart_attack(request: Request):
-#     # Convert input data to a numpy array for prediction
-#     data = await request.json()
-#     data_dict = {key: int(value) for key, value in data.items()}
+    if current_user['role'] != "user":
+        raise HTTPException(
+            status_code=403,
+            detail="Only users can measure")
+    else: 
+    
+        mqtt_client = mqtt.Client()
+        # Set the callbacks
+        mqtt_client.on_connect = on_connect
+        mqtt_client.on_message = on_message  
+
+        try:
+            # Connect to the MQTT broker
+            mqtt_client.connect(broker_address, 1883, 60)
+
+            # Wait for the connection to establish
+            mqtt_client.loop_start()
+            while not mqtt_client.is_connected():
+                time.sleep(1)
+
+            # Wait for a short duration to receive messages
+            time.sleep(1)  
+
+        finally:
+            # Disconnect from the MQTT broker
+            mqtt_client.loop_stop()
+
+        with sensor_data_lock:
+            # return sensor_data
+            print(sensor_data)
+            print(type(sensor_data))
+            users_collection.update_one(
+                {"username": current_user['username']},
+                {
+                    "$addToSet": {"measure": sensor_data},
+                })
+            return "done"
+# Function to formulate JSON structure for prediction
+def formulate_prediction_data(user_data):
+    ap_hi = user_data["measure"][-1].get("ap_hi")
+    ap_lo = user_data["measure"][-1].get("ap_lo")
+
+    health_data = user_data["health_data"]
+
+    prediction_data = {
+        "age": health_data.get("age", 0),
+        "height": health_data.get("height", 0),
+        "weight": health_data.get("weight", 0),
+        "gender": health_data.get("gender", 0),
+        "ap_hi": ap_hi,
+        "ap_lo": ap_lo,
+        "cholesterol": health_data.get("cholesterol", 0),
+        "gluc": health_data.get("gluc", 0),
+        "smoke": health_data.get("smoke", 0),
+        "alco": health_data.get("alco", 0),
+        "active": health_data.get("active", 0),
+    }
+
+    return prediction_data
+@app.post('/predict')
+async def predict_heart_attack( current_user: dict = Depends(get_current_user)):
+    # Convert input data to a numpy array for prediction
+    # Fetch user data from the database
+    user_data = get_patient_data(current_user["username"])
+    # Formulate JSON structure for prediction
+    prediction_data = formulate_prediction_data(user_data)   
  
-#     loaded_rf_model = joblib.load('rf_model_73.joblib')
+    loaded_rf_model = joblib.load('rf_model_73.joblib')
+ 
+    # Make predictions using the loaded model
+    prediction = loaded_rf_model.predict(preprocess(prediction_data))
+      # Add predicted value to user data
+    user_data["prediction"] = int(prediction)
+    # Update user data in the database
+    users_collection.update_one(
+        {"username": current_user['username']},
+        {"$set": user_data}
+    )
+    # Return the prediction as a response
+    return {"prediction": int(prediction)}
 
-#     # Make predictions using the loaded model
-#     prediction = loaded_rf_model.predict(preprocess(data_dict))
-#     # Return the prediction as a response
-#     return {"prediction": int(prediction)}
+# Function to get health status
+def get_health_status(health_data: Dict,measure_data: Dict):
+   
+
+    # Calculate BMI
+    bmi = health_data.get("weight", 0) / ((health_data.get("height", 0) / 100) ** 2)
+
+    # Analyze BMI
+    bmi_status = "Normal"
+    if bmi < 18.5:
+        bmi_status = "Underweight"
+    elif 18.5 <= bmi < 24.9:
+        bmi_status = "Normal"
+    elif 25 <= bmi < 29.9:
+        bmi_status = "Overweight"
+    elif bmi >= 30:
+        bmi_status = "Obese"
+
+    # Analyze Blood Pressure
+    ap_hi = measure_data.get("ap_hi", 0)
+    ap_lo = measure_data.get("ap_lo", 0)
+    
+    pressure_status = "Normal"
+    if ap_hi >= 140 or ap_lo >= 90:
+        pressure_status = "High"
+    elif ap_hi <= 90 or ap_lo <= 60:
+        pressure_status = "Low"
+
+    # Analyze Saturation Data
+    saturation_data = measure_data.get("saturation_data", 0)
+
+    saturation_status = "Normal"
+    if saturation_data < 95:
+        saturation_status = "Low"
+
+    # Compile the results
+    health_status = {
+        "bmi": bmi,
+        "bmi_status": bmi_status,
+        "blood_pressure_status": pressure_status,
+        "saturation_status": saturation_status
+    }
+
+    # Store the health status back into user_data
+    user_data["health_status"] = health_status
+
+    # Update user data in the database
+    users_collection.update_one(
+        {"username": user_data['username']},
+        {"$set": {"health_status": health_status}}
+    )
+
+    return health_status
+    # Endpoint to get user health status
+@app.get("/user/health-status", response_model=Dict)
+async def get_user_health_status(request: Request, current_user: dict = Depends(get_current_user)):
+    # Fetch user data from the database
+    user_data = users_collection.find_one({"username":current_user['username'] })
+    health_data = user_data.get("health_data")
+    measure_data = user_data.get("measure")[-1]
+        
+
+    # Get health status
+    
+
+    return {"health_data":health_data,"measure_data":measure_data}
