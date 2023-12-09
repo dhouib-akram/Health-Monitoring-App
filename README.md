@@ -50,8 +50,28 @@ For doctors, we've designed a dedicated interface where they can access and revi
 - **Mosquitto Broker**:
 
   Integrated to facilitate communication between sensors and the backend, ensuring a reliable and secure exchange of data from the sensors to the server.
-  
+
 ![Project Structure](./project_structure.png)
+
+## Supported Sensors
+
+Our application integrates with various sensors to gather essential health data. Here are the supported sensors:
+
+### MAX30100 (Heart Rate + SpO2 Sensor)
+
+- The MAX30100 sensor is used to measure both heart rate and blood oxygen saturation (SpO2).
+
+### DS18B20 (Temperature Sensor)
+
+- The DS18B20 sensor is employed to measure temperature accurately.
+### MPS20N0040D (Blood Pressure Sensor)
+
+- The MPS20N0040D sensor is utilized to measure blood pressure.
+- It aids in monitoring blood pressure levels, providing crucial information for healthcare assessment.
+
+
+
+  
 
 ## Getting Started
 1. To run the backend of our application, follow these steps:
