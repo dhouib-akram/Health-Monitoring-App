@@ -16,11 +16,12 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union
 import joblib
 import sys
-import bcrypt
 import paho.mqtt.client as mqtt
 
 import time
 import threading
+import bcrypt
+
 sys.path.append("..")
 broker_address = "91.121.93.94"  
 
@@ -86,6 +87,7 @@ def get_patient_data(username: str):
     return user_data
 def verify_password(entered_password, hashed_password):
     return bcrypt.checkpw(entered_password.encode('utf-8'), hashed_password.encode('utf-8'))
+
 SECRET_KEY = "IYAwM+O69b20dBSjHAiBeX6NdHu6Ca9nklSc8A+cn9Y="
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES=3000
@@ -157,7 +159,7 @@ async def root():
     return {"Welcome to the health monitoring app"}
 
 # Connect to MongoDB
-client = MongoClient("mongodb://localhost:27017")
+client = MongoClient("mongodb://admin:password@localhost:27017/")
 db = client["HealthData"]
 users_collection = db["Users"]
 doctors_collection = db["Doctors"]
@@ -212,11 +214,11 @@ async def login(request: Request):
     # Try to find the user in the users_collection
     if role == 'user':
         user = users_collection.find_one({"username": username})
+        print(user)
     if role == "doctor":
-        user = doctors_collection.find_one({"username": username})     
+        user = doctors_collection.find_one({"username": username})  
            
     if user and verify_password(password, user["password"]):
-      
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
             data={"sub": user["username"] ,"role": role}, expires_delta=access_token_expires
@@ -414,7 +416,7 @@ async def get_doctors():
     return doctors
 
 # Define a route to handle the GET request without authentication
-@app.post("/getM/")
+@app.post("/getM")
 async def get_sensor_data(current_user: dict = Depends(get_current_user)):
 
     if current_user['role'] != "user":
