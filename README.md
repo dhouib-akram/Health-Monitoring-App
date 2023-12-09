@@ -4,6 +4,7 @@
 
 - [Introduction](#introduction)
 - [Technologies Used](#technologies-used)
+- [Supported Sensors](#supported-sensors)
 - [Getting Started](#getting-started)
 - [Security](#security)
 - [Demo](#demo)
