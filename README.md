@@ -78,8 +78,9 @@ Our application integrates with various sensors to gather essential health data.
 
    ```bash
    git clone https://github.com/your-username/your-repo.git
-   cd backend
    pip install -r requirements.txt
+   cd backend
+
    uvicorn main:app --reload
    ```
 2. For the frontend, kidnly follow these steps:
@@ -127,3 +128,9 @@ You have two options for setting up MongoDB for our application:
 ### Security 
 
 To ensure the security of our application and protect sensitive data, we employ robust encryption measures before transmitting any information. The majority of our communications are conducted using the secure shell (SSH) protocol, adding an extra layer of protection against unauthorized access. Additionally, for local development purposes, we utilize mkcert to implement Transport Layer Security (TLS) on localhost. 
+
+
+### Demo 
+
+[![Watch the video](https://img.youtube.com/vi/YOUR_VIDEO_ID_HERE/0.jpg)](https://www.youtube.com/watch?v=YOUR_VIDEO_ID_HERE)
+
