@@ -18,6 +18,7 @@ import 'react-circular-progressbar/dist/styles.css';
 import { MyDoctors } from "./my_doctors";
 import { useEffect, useState } from "react";
 import { UserSheet } from "../user_Sheet";
+import { Icons } from "../icons";
 
 interface HealthData {
     age: number;
@@ -51,45 +52,10 @@ interface User {
     health_status: Record<string, any>; // Change this to the actual type if it's not an empty object
 }
 export default function Dashboard() {
-    const areadata = [
-        {
-            "day": "monday",
-            "last_week": 4000,
-            "recent_week": 2400
-        },
-        {
-            "day": "tuesday",
-            "last_week": 3000,
-            "recent_week": 2700
-        },
-        {
-            "day": "wednesday",
-            "last_week": 1000,
-            "recent_week": 1400
-        },
-        {
-            "day": "thursday",
-            "last_week": 5000,
-            "recent_week": 6000
-        },
-        {
-            "day": "friday",
-            "last_week": 4000,
-            "recent_week": 2400
-        },
-        {
-            "day": "saturday",
-            "last_week": 3000,
-            "recent_week": 2400
-        },
-        {
-            "day": "sunday",
-            "last_week": 4000,
-            "recent_week": 5400
-        },
-    ];
     const token = localStorage.getItem('access_token');
     const [user, setUser] = useState<User>();
+    const [mesure, setMesure] = useState(false);
+    const [isLoading, setIsLoading] = useState<boolean>(false)
     useEffect(() => {
         const fetchdata = async () => {
             const response = await fetch('http://127.0.0.1:8000/user/info', {
@@ -103,10 +69,36 @@ export default function Dashboard() {
             const responseBody = await response.json();
             console.log(responseBody)
             setUser(responseBody)
+            setMesure(false)
         }
         fetchdata();
-    }, [token]);
+    }, [token, mesure]);
+    async function GetMeasure() {
+        setIsLoading(true)
+        const response = await fetch('http://127.0.0.1:8000/getM', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', // Adjust the content type if needed,
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        const response2 = await fetch('http://127.0.0.1:8000/user/health-status', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json', // Adjust the content type if needed,
+                'Authorization': `Bearer ${token}`
+            }
+        });
+        if (response.status === 200 && response2.status === 200) {
+            const responseBody = await response.json();
+            console.log(responseBody)
+            setMesure(true)
+            setIsLoading(false)
+        }
+        else {
 
+        }
+    }
     const [open, setOpen] = useState(false)
     return (
         <>
@@ -135,7 +127,12 @@ export default function Dashboard() {
                 <div className="flex-1 space-y-4 p-8 pt-6">
                     <div className="flex items-center justify-between space-y-2">
                         <h2 className="text-3xl font-semibold tracking-tight">Welcome Back</h2>
-                        <Button className="px-8">Predict</Button>
+                        <div className="space-x-2">
+                            <Button className="px-8">Predict</Button>
+                            <Button disabled={isLoading} className="px-8" onClick={() => { GetMeasure() }}>{isLoading && (
+                                <Icons.spinner className="mr-2 h-4 w-4 animate-spin" />
+                            )}Get Mesure</Button>
+                        </div>
                     </div>
                     <div className="space-y-4">
                         <div className="space-y-4">
@@ -155,7 +152,8 @@ export default function Dashboard() {
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
                                                 <p className=" font-semibold text-lg">
-                                                    <span className="text-black-800">{user?.measure[user?.measure?.length - 1]?.heart_rate_data} BPM</span>
+                                                    {user?.health_status?.heart_rate_status === 'Moderate' && (<span className="text-green-800">{user?.measure[user?.measure?.length - 1]?.heart_rate_data} BPM</span>)}
+                                                    {user?.health_status?.heart_rate_status !== 'Moderate' && (<span className="text-red-800">{user?.measure[user?.measure?.length - 1]?.heart_rate_data} BPM</span>)}
                                                 </p>
                                             </div>
                                         </div>
@@ -225,7 +223,7 @@ export default function Dashboard() {
                                             </div>
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <p className=" font-semibold text-lg"><span className="text-black-800">{user?.measure[user?.measure?.length - 1]?.temp}°C</span> </p>
+                                                <p className=" font-semibold text-lg"><span className="text-green-800">{user?.measure[user?.measure?.length - 1]?.temp}°C</span> </p>
                                             </div>
                                         </div>
                                     </CardContent>
@@ -249,7 +247,8 @@ export default function Dashboard() {
                                             </div>
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <p className=" font-semibold text-lg"><span className="text-black-800">{parseFloat(user?.health_status?.bmi).toFixed(2)}</span> </p>
+                                                {user?.health_status?.bmi_status === 'Normal' && (<h2 className=" font-bold text-green-800">{parseFloat(user?.health_status?.bmi).toFixed(2)}</h2>)}
+                                                {user?.health_status?.bmi_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{parseFloat(user?.health_status?.bmi).toFixed(2)}</h2>)}
                                             </div>
                                         </div>
                                     </CardContent>
@@ -274,15 +273,17 @@ export default function Dashboard() {
                                             </div>
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <p className=" font-semibold text-lg"><span className="text-black-700 text-left"><span className=" text-gray-500">sys:</span> {user?.measure[user?.measure?.length - 1]?.ap_hi}</span> </p>
-                                                <p className=" font-semibold text-lg"><span className="text-black-700 text-left"><span className=" text-gray-500">dia:</span> {user?.measure[user?.measure?.length - 1]?.ap_lo}</span> </p>
+                                                {user?.health_status?.blood_pressure_status === 'Normal' && (<h2 className=" font-bold text-green-800"><span className=" text-gray-500">sys:</span>{user?.measure[user?.measure?.length - 1]?.ap_hi}</h2>)}
+                                                {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-red-800"><span className=" text-gray-500">sys:</span>{user?.measure[user?.measure?.length - 1]?.ap_hi}</h2>)}
+                                                {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-red-800"><span className=" text-gray-500">dia:</span>{user?.measure[user?.measure?.length - 1]?.ap_lo}</h2>)}
+                                                {user?.health_status?.blood_pressure_status === 'Normal' && (<h2 className=" font-bold text-green-800"><span className=" text-gray-500">dia:</span>{user?.measure[user?.measure?.length - 1]?.ap_lo}</h2>)}
                                             </div>
                                         </div>
                                     </CardContent>
                                     <CardFooter className="flex items-center justify-center">
                                         <div className=" mt-10 flex items-center justify-center">
                                             {user?.health_status?.blood_pressure_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.blood_pressure_status}</h2>)}
-                                            {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.blood_pressure_status}</h2>)}
+                                            {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{user?.health_status?.blood_pressure_status}</h2>)}
                                         </div>
                                     </CardFooter>
                                 </Card>
@@ -300,14 +301,16 @@ export default function Dashboard() {
                                             </div>
                                             {/* Column 2 */}
                                             <div className="flex flex-col items-center pl-4">
-                                                <p className=" font-semibold text-lg"><span className="text-black-700">{user?.measure[user?.measure?.length - 1]?.saturation_data}%</span> </p>
+                                                {user?.health_status?.saturation_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.measure[user?.measure?.length - 1]?.saturation_data}%</h2>)}
+                                                {user?.health_status?.saturation_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{user?.measure[user?.measure?.length - 1]?.saturation_data}%</h2>)}
+
                                             </div>
                                         </div>
                                     </CardContent>
                                     <CardFooter className="flex items-center justify-center">
                                         <div className=" mt-10 flex items-center justify-center">
-                                            {user?.health_status?.blood_pressure_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.blood_pressure_status}</h2>)}
-                                            {user?.health_status?.blood_pressure_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{user?.health_status?.blood_pressure_status}</h2>)}
+                                            {user?.health_status?.saturation_status === 'Normal' && (<h2 className=" font-bold text-green-800">{user?.health_status?.saturation_status}</h2>)}
+                                            {user?.health_status?.saturation_status !== 'Normal' && (<h2 className=" font-bold text-red-800">{user?.health_status?.saturation_status}</h2>)}
                                         </div>
                                     </CardFooter>
                                 </Card>

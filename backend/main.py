@@ -26,10 +26,11 @@ sys.path.append("..")
 broker_address = "91.121.93.94"  
 
 # MQTT topics to subscribe to
-mqtt_pressure_topic = "device/data/pressure"
+mqtt_sys_topic = "device/data/sys_pressure"
+mqtt_dia_topic = "device/data/dia_pressure"
 mqtt_saturation_topic = "device/data/saturation"
 mqtt_heart_rate_topic = "device/data/heartRate"
-mqtt_command_topic = "device/command"
+mqtt_temp_topic = "device/data/temp"
 
 # Create a dictionary to store the data
 sensor_data = {
@@ -44,22 +45,22 @@ sensor_data_lock = threading.Lock()
 
 def update_sensor_data(msg):
     with sensor_data_lock:
-        if msg.topic == mqtt_pressure_topic:
+        if msg.topic == mqtt_sys_topic:
             sensor_data["ap_hi"] = int(msg.payload.decode().split(":")[1])
-        elif msg.topic == mqtt_pressure_topic:
+        elif msg.topic == mqtt_dia_topic:
             sensor_data["ap_lo"] = int(msg.payload.decode().split(":")[1])
         elif msg.topic == mqtt_saturation_topic:
             saturation_value = int(msg.payload.decode().split(":")[1])
             sensor_data["saturation_data"] = saturation_value
         elif msg.topic == mqtt_heart_rate_topic:
             sensor_data["heart_rate_data"] = int(msg.payload.decode().split(":")[1])
-        elif msg.topic == mqtt_heart_rate_topic:
+        elif msg.topic == mqtt_temp_topic:
             sensor_data["temp"] = int(msg.payload.decode().split(":")[1])
 # Callback when the client connects to the broker
 def on_connect(client, userdata, flags, rc):
     print(f"Connected with result code {rc}")
-    client.publish(mqtt_command_topic, "1")
-    client.subscribe([(mqtt_pressure_topic, 0), (mqtt_saturation_topic, 0), (mqtt_heart_rate_topic, 0)])
+    client.subscribe([(mqtt_sys_topic, 0), (mqtt_saturation_topic, 0), (mqtt_heart_rate_topic, 0),(mqtt_dia_topic, 0),(mqtt_temp_topic, 0)])
+
 
 
 def on_message(client, userdata, msg):
@@ -78,7 +79,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 # Function to fetch user data from the database
 def get_patient_data(username: str):
     user_data = users_collection.find_one({"username": username})
@@ -214,10 +214,9 @@ async def login(request: Request):
     # Try to find the user in the users_collection
     if role == 'user':
         user = users_collection.find_one({"username": username})
-        print(user)
     if role == "doctor":
         user = doctors_collection.find_one({"username": username})  
-           
+
     if user and verify_password(password, user["password"]):
         access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
         access_token = create_access_token(
@@ -536,7 +535,7 @@ def get_health_status(health_data: Dict,measure_data: Dict):
     if saturation_data < 95:
         saturation_status = "Low"
            # Analyze heart rate and update the health status
-    heart_rate = measure_data.get("saturation_data")
+    heart_rate = measure_data.get("heart_rate_data")
     if 60 <= heart_rate < 100:
         heart_stats = "Moderate"
     elif 50 <= heart_rate < 60:
