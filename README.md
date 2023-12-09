@@ -1,7 +1,5 @@
 # Health Monitoring App
 
-Brief description or tagline for your project.
-
 ## Table of Contents
 
 - [Introduction](#introduction)
