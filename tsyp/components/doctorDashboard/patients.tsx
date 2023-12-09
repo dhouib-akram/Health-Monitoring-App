@@ -15,7 +15,7 @@ export function MyPatients() {
                         olivia.martin@email.com
                     </p>
                 </div>
-                <div className="ml-auto font-medium">cardiologist</div>
+                <div className="ml-auto font-medium text-green-500 border bg-green-200 p-2  rounded-lg">Well</div>
             </div>
             <div className="flex items-center">
                 <Avatar className="flex h-9 w-9 items-center justify-center space-y-0 border">
@@ -26,7 +26,7 @@ export function MyPatients() {
                     <p className="text-sm font-medium leading-none">Jackson Lee</p>
                     <p className="text-sm text-muted-foreground">jackson.lee@email.com</p>
                 </div>
-                <div className="ml-auto font-medium">cardiologist</div>
+                <div className="ml-auto font-medium text-red-500 border bg-red-200 p-2 rounded-lg">Requires Attention</div>
             </div>
             <div className="flex items-center">
                 <Avatar className="h-9 w-9">
@@ -39,7 +39,7 @@ export function MyPatients() {
                         isabella.nguyen@email.com
                     </p>
                 </div>
-                <div className="ml-auto font-medium">cardiologist</div>
+                <div className="ml-auto font-medium text-red-500 border bg-red-200 p-2 rounded-lg">Requires Attention</div>
             </div>
             <div className="flex items-center">
                 <Avatar className="h-9 w-9">
@@ -50,7 +50,7 @@ export function MyPatients() {
                     <p className="text-sm font-medium leading-none">William Kim</p>
                     <p className="text-sm text-muted-foreground">will@email.com</p>
                 </div>
-                <div className="ml-auto font-medium">cardiologist</div>
+                <div className="ml-auto font-medium text-red-500 border bg-red-200 p-2 rounded-lg">Requires Attention</div>
             </div>
         </div>
     )
